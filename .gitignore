@@ -220,3 +220,7 @@ __marimo__/
 # Project Specific Folders
 
 model/
+
+# Model files
+android/summarizer/app/src/main/assets/model.pte
+android/summarizer/app/src/main/assets/tokenizer.model
