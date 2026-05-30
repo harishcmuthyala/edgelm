@@ -4,26 +4,31 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.example.edgelm_summarizer.ui.theme.EdgelmsummarizerTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: SummarizerViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             EdgelmsummarizerTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    SummaryScreen(viewModel = viewModel)
                 }
             }
         }
@@ -31,17 +36,126 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+fun SummaryScreen(viewModel: SummarizerViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+    val clipboard = LocalClipboardManager.current
+    val scrollState = rememberScrollState()
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    EdgelmsummarizerTheme {
-        Greeting("Android")
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .systemBarsPadding()
+    ) {
+
+        // ── Header ────────────────────────────────────────────────────────
+        Text(
+            text = "edgelm",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "On-device summarization",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Model status ──────────────────────────────────────────────────
+        if (!uiState.isModelReady && !uiState.isLoading) {
+            Text(
+                text = uiState.error ?: "Model not loaded",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        if (uiState.isLoading && uiState.summary.isEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Loading model...",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ── Input ─────────────────────────────────────────────────────────
+        OutlinedTextField(
+            value = uiState.inputText,
+            onValueChange = { viewModel.updateInput(it) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.45f),
+            placeholder = { Text("Paste your article or text here...") },
+            enabled = !uiState.isLoading
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ── Button ────────────────────────────────────────────────────────
+        Button(
+            onClick = {
+                if (uiState.isLoading) viewModel.stop()
+                else viewModel.summarize()
+            },
+            enabled = uiState.isModelReady,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                when {
+                    !uiState.isModelReady  -> "Loading model..."
+                    uiState.isLoading      -> "Stop"
+                    else                   -> "Summarize"
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Output ────────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Summary", fontWeight = FontWeight.SemiBold)
+            if (uiState.summary.isNotEmpty()) {
+                TextButton(onClick = {
+                    clipboard.setText(AnnotatedString(uiState.summary))
+                }) {
+                    Text("Copy")
+                }
+            }
+        }
+
+        if (uiState.isLoading && uiState.summary.isNotEmpty()) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.55f)
+        ) {
+            Text(
+                text = if (uiState.summary.isEmpty() && !uiState.isLoading)
+                    "Summary will appear here..."
+                else
+                    uiState.summary,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState),
+                color = if (uiState.summary.isEmpty())
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                else
+                    MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }

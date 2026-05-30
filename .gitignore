@@ -224,3 +224,12 @@ model/
 # Model files
 android/summarizer/app/src/main/assets/model.pte
 android/summarizer/app/src/main/assets/tokenizer.model
+
+# Android
+android/summarizer/.idea/
+android/summarizer/app/build/
+android/summarizer/build/
+android/summarizer/local.properties
+*.pte
+*.bin
+tokenizer.model
