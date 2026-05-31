@@ -71,12 +71,17 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
             )
         }
 
-        if (uiState.isLoading && uiState.summary.isEmpty()) {
+        if (uiState.isLoading) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Loading model...",
+                    text = if (!uiState.isModelReady) "Loading model..."
+                    else if (uiState.summary.isEmpty()) "Processing input..."
+                    else "Generating summary...",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -94,6 +99,20 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
             placeholder = { Text("Paste your article or text here...") },
             enabled = !uiState.isLoading
         )
+
+        // Add Word Count Display
+        if (uiState.inputText.isNotEmpty()) {
+            Text(
+                text = "${uiState.wordCount} words" +
+                        if (uiState.isOverLimit) " — will be truncated to ${LlamaRunner.MAX_INPUT_WORDS}" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (uiState.isOverLimit)
+                    MaterialTheme.colorScheme.error
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 

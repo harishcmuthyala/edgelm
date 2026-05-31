@@ -9,11 +9,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 data class SummarizerUiState(
-    val inputText: String  = "",
-    val summary: String    = "",
-    val isLoading: Boolean = false,
+    val inputText: String     = "",
+    val summary: String       = "",
+    val isLoading: Boolean    = false,
     val isModelReady: Boolean = false,
-    val error: String?     = null
+    val error: String?        = null,
+    val wordCount: Int        = 0,
+    val isOverLimit: Boolean  = false
 )
 
 class SummarizerViewModel(application: Application) : AndroidViewModel(application) {
@@ -40,7 +42,13 @@ class SummarizerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun updateInput(text: String) {
-        _uiState.value = _uiState.value.copy(inputText = text)
+        val count      = LlamaRunner.wordCount(text)
+        val overLimit  = count > LlamaRunner.MAX_INPUT_WORDS
+        _uiState.value = _uiState.value.copy(
+            inputText   = text,
+            wordCount   = count,
+            isOverLimit = overLimit
+        )
     }
 
     fun summarize() {
@@ -55,8 +63,8 @@ class SummarizerViewModel(application: Application) : AndroidViewModel(applicati
 
         viewModelScope.launch(Dispatchers.IO) {
             runner.summarize(
-                text      = text,
-                onToken   = { token ->
+                text       = text,
+                onToken    = { token ->
                     _uiState.value = _uiState.value.copy(
                         summary = _uiState.value.summary + token
                     )
