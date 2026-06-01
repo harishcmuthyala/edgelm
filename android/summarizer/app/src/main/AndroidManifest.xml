@@ -16,11 +16,20 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Edgelmsummarizer">
+
+            <!-- Launcher intent — opens app normally -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Text selection intent — appears in system share/process menu -->
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
         </activity>
     </application>
 
