@@ -1,6 +1,5 @@
 package com.example.edgelm_summarizer
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,17 +25,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        // Handle ACTION_PROCESS_TEXT — text selected from another app
-        if (intent.action == Intent.ACTION_PROCESS_TEXT) {
-            val selectedText = intent
-                .getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
-                ?.toString() ?: ""
-            if (selectedText.isNotBlank()) {
-                viewModel.updateInput(selectedText)
-            }
-        }
-
         setContent {
             EdgelmsummarizerTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -60,7 +48,6 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
             .systemBarsPadding()
     ) {
 
-        // ── Header ────────────────────────────────────────────────────────
         Text(
             text = "edgelm",
             style = MaterialTheme.typography.headlineMedium,
@@ -74,7 +61,6 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ── Model status ──────────────────────────────────────────────────
         if (!uiState.isModelReady && !uiState.isLoading) {
             Text(
                 text = uiState.error ?: "Model not loaded",
@@ -101,7 +87,6 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ── Input ─────────────────────────────────────────────────────────
         OutlinedTextField(
             value = uiState.inputText,
             onValueChange = { viewModel.updateInput(it) },
@@ -127,7 +112,6 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ── Button ────────────────────────────────────────────────────────
         Button(
             onClick = {
                 if (uiState.isLoading) viewModel.stop()
@@ -147,7 +131,6 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ── Output ────────────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

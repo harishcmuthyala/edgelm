@@ -11,26 +11,32 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Edgelmsummarizer">
+
+        <!-- Main app launcher -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Edgelmsummarizer">
-
-            <!-- Launcher intent — opens app normally -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
 
-            <!-- Text selection intent — appears in system share/process menu -->
+        <!-- Text selection handler — transparent window -->
+        <activity
+            android:name=".ProcessTextActivity"
+            android:exported="true"
+            android:label="edgelm"
+            android:theme="@style/Theme.ProcessText">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-
         </activity>
+
     </application>
 
 </manifest>
