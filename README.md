@@ -1,4 +1,4 @@
-# edgelm
+# EdgeLM
 
 **On-device LLM summarization for Android — no cloud, no latency, no data leaving your phone.**
 
