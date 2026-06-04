@@ -13,8 +13,8 @@ class LlamaRunner(private val context: Context) {
     private var summaryStarted = false
 
     companion object {
-        private const val MODEL_FILE      = "model.pte"
-        private const val TOKENIZER_FILE  = "tokenizer.model"
+        private const val MODEL_FILE      = ModelDownloader.MODEL_FILENAME
+        private const val TOKENIZER_FILE  = ModelDownloader.TOKENIZER_FILENAME
         private const val TEMPERATURE     = 0.8f
         private const val MAX_TOKENS      = 1024
         const val MAX_INPUT_WORDS         = 200
@@ -46,8 +46,8 @@ Summary:"""
 
     fun load(): Boolean {
         return try {
-            val modelPath     = copyAssetToCache(MODEL_FILE)
-            val tokenizerPath = copyAssetToCache(TOKENIZER_FILE)
+            val modelPath     = getModelPath(MODEL_FILE)
+            val tokenizerPath = getModelPath(TOKENIZER_FILE)
             module = LlmModule(modelPath, tokenizerPath, TEMPERATURE)
             val result = module!!.load()
             result == 0
@@ -64,8 +64,8 @@ Summary:"""
     ) {
         // Recreate module before each call to reset KV cache pos_ to 0
         try {
-            val modelPath     = copyAssetToCache(MODEL_FILE)
-            val tokenizerPath = copyAssetToCache(TOKENIZER_FILE)
+            val modelPath     = getModelPath(MODEL_FILE)
+            val tokenizerPath = getModelPath(TOKENIZER_FILE)
             module = LlmModule(modelPath, tokenizerPath, TEMPERATURE)
             module!!.load()
             android.util.Log.d("LlamaRunner", "Module recreated, KV cache reset")
@@ -161,15 +161,7 @@ Summary:"""
         module?.stop()
     }
 
-    private fun copyAssetToCache(filename: String): String {
-        val outFile = File(context.cacheDir, filename)
-        if (!outFile.exists()) {
-            context.assets.open(filename).use { input ->
-                FileOutputStream(outFile).use { output ->
-                    input.copyTo(output)
-                }
-            }
-        }
-        return outFile.absolutePath
+    private fun getModelPath(filename: String): String {
+        return File(context.filesDir, filename).absolutePath
     }
 }
