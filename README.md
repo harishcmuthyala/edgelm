@@ -1,138 +1,201 @@
-# edgelm
+# EdgeLM
 
-On-device language model deployments for Android using ExecuTorch and Llama 3.2 1B.
+**On-device LLM summarization for Android — no cloud, no latency, no data leaving your phone.**
 
-ExecuTorch (MLSys 2026) is the first framework to solve *experimentation parity* — validate quantization, debug numerics, and profile performance entirely in PyTorch before the model ever touches a device. No conversion step. No numerical surprises after deployment. This repo is a working implementation of that pipeline across real Android use cases.
-
----
-
-## Use cases
-
-### 1. Summarizer app
-A standalone Android app. Paste or share any long-form text and get a concise summary generated entirely on-device.
-
-### 2. System-level text selection
-Register as a system action on Android. When a user selects text anywhere — browser, email, notes, any app — "Summarize" appears directly in the text selection toolbar. Tap it, get a local summary instantly. No internet. No API. Works system-wide.
-
-This is the more compelling demo: it runs inside apps you don't own, the inference is invisible to the user, and the privacy story is immediately obvious.
+edgelm runs a quantized Llama 3.2 1B model directly on your Android device using Meta's ExecuTorch runtime. Paste any article or select text from any app to get an instant summary — fully offline, fully private.
 
 ---
 
-## The pipeline
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01_download.png" width="200"/><br/><sub>First launch — model download</sub></td>
+    <td align="center"><img src="docs/screenshots/02_empty.png" width="200"/><br/><sub>Main screen</sub></td>
+    <td align="center"><img src="docs/screenshots/03_generating.png" width="200"/><br/><sub>Streaming summary</sub></td>
+    <td align="center"><img src="docs/screenshots/04_complete.png" width="200"/><br/><sub>Summary complete</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/05_text_select.png" width="200"/><br/><sub>Select text in Chrome</sub></td>
+    <td align="center"><img src="docs/screenshots/06_menu.png" width="200"/><br/><sub>edgelm in system menu</sub></td>
+    <td align="center"><img src="docs/screenshots/07_sheet_streaming.png" width="200"/><br/><sub>Bottom sheet streaming</sub></td>
+    <td align="center"><img src="docs/screenshots/08_sheet_complete.png" width="200"/><br/><sub>Summary over Chrome</sub></td>
+  </tr>
+</table>
+
+---
+
+## What it does
+
+- **Standalone summarizer** — paste any text, get a 3-sentence summary in ~5 seconds
+- **System-wide text selection** — select text in any app (Chrome, Gmail, Notes), tap edgelm, summary appears as a bottom sheet overlay without leaving the app
+- **Fully on-device** — no internet required after first launch, no data sent to any server
+- **On-demand model download** — APK is ~15 MB, model downloads once on first launch (~1.1 GB)
+
+---
+
+## Architecture
 
 ```
-Python (one-time export)               Android (every inference)
-────────────────────────               ─────────────────────────
-HuggingFace model                      Text input
-      ↓                                      ↓
-int4/int8 quantization                 Prompt template
-      ↓                                      ↓
-torch.export → Edge Dialect            C++ tokenizer
-      ↓                                      ↓
-XNNPACK delegation                     ExecuTorch runtime (~26 KiB)
-      ↓                                      ↓
-model.pte (~821 MB) ─────────────────▶ Streamed summary output
+┌─────────────────────────────────────────────────────────┐
+│                     Export Pipeline                      │
+│                                                          │
+│  meta-llama/Llama-3.2-1B-Instruct                       │
+│         ↓ SpinQuant INT4 quantization                    │
+│  Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte           │
+│         ↓ hosted on HuggingFace (public)                 │
+│  Downloaded to device on first launch                    │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                    Android Runtime                       │
+│                                                          │
+│  LlmModule (ExecuTorch 1.2.0)                           │
+│         ↓ loads .pte from filesDir                       │
+│  LlamaRunner.kt                                          │
+│    → truncateInput() — word limit enforcement            │
+│    → generate() — streams tokens via LlmCallback         │
+│    → section detection — stops at bullet points          │
+│    → safeComplete() — guards double completion           │
+│         ↓                                                │
+│  SummarizerViewModel.kt — StateFlow UI state             │
+│         ↓                                                │
+│  MainActivity / ProcessTextActivity                      │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                   Entry Points                           │
+│                                                          │
+│  App launcher → MainActivity                             │
+│    Full-screen input/output UI                           │
+│                                                          │
+│  ACTION_PROCESS_TEXT → ProcessTextActivity               │
+│    Transparent Activity + ModalBottomSheet overlay       │
+│    Auto-summarizes on arrival, no extra tap needed       │
+└─────────────────────────────────────────────────────────┘
 ```
-
----
-
-## Why this matters
-
-Most on-device ML pipelines today use ONNX, TFLite, or llama.cpp — each requiring model conversion or complete reimplementation outside PyTorch. ExecuTorch eliminates that gap. The same quantized model you debug in Python runs on the phone, with behavior that matches almost exactly.
-
-This repo validates that claim across two deployment surfaces: a standalone app and a system-level Android integration.
-
----
-
-## Repo structure
-
-```
-edgelm/
-├── export/
-│   ├── export_model.py        # Export Llama 3.2 1B → model.pte
-│   ├── validate.py            # Validate summary quality in Python
-│   └── prompt_template.py     # Shared prompt used at runtime
-│
-├── android/
-│   ├── summarizer/            # Standalone summarizer app
-│   │   ├── MainActivity.kt
-│   │   ├── SummarizerViewModel.kt
-│   │   └── LlamaRunner.kt
-│   │
-│   └── process-text/          # System-level text selection integration
-│       ├── SummarizeActivity.kt
-│       └── AndroidManifest.xml
-│
-├── docs/
-│   └── benchmarks.md
-│
-├── requirements.txt
-└── README.md
-```
-
----
-
-## Roadmap
-
-### Phase 1 — Export & validate (Week 1)
-- [ ] Export Llama 3.2 1B with int4/int8 quantization → `model.pte`
-- [ ] Validate summary quality against HuggingFace pipeline in Python
-- [ ] Confirm XNNPACK output matches eager mode
-
-### Phase 2 — Summarizer app (Week 2)
-- [ ] Load `model.pte` on Android via `LlamaRunner.kt`
-- [ ] Stream tokens to UI as they generate
-- [ ] Basic input / output screen
-
-### Phase 3 — Text selection integration (Week 3)
-- [ ] Register `ACTION_PROCESS_TEXT` intent
-- [ ] Receive selected text from any app system-wide
-- [ ] Show streamed summary in a bottom sheet overlay
-
-### Phase 4 — Polish & benchmark (Week 4)
-- [ ] Benchmark prefill and decode on multiple devices
-- [ ] On-demand model download (avoid bundling 821 MB in APK)
-- [ ] Demo video
 
 ---
 
 ## Performance
 
-Benchmarked figures from the ExecuTorch paper (Samsung Galaxy S25 Ultra, Llama 3.2 1B, group size 32):
+Measured on **Google Pixel 10** with Llama 3.2 1B SpinQuant INT4:
 
-| Backend | Prefill | Decode |
-|---|---|---|
-| XNNPACK (CPU) | ~529 tok/s | ~67 tok/s |
-| Vulkan (GPU) | ~928–1208 tok/s | ~59–66 tok/s |
+| Metric | Value |
+|---|---|
+| Prefill speed | 150–220 tok/s |
+| Decode speed | 15–20 tok/s |
+| Time to first token | 0.5–1.2s |
+| Total time (80 words input) | ~4–5s |
+| Model size | 1.14 GB (INT4 quantized) |
+| Memory (RSS) | ~1,500 MiB |
+| Context window | 2,048 tokens |
+| Max input | 200 words (~260 tokens) |
 
-For a 500-word input and 100-word summary: ~1s to first token, ~2s total on CPU.
+**Paper benchmark** (OnePlus 12, Snapdragon 8 Elite): 50.2 tok/s decode, 260.5 tok/s prefill. Pixel 10 uses Tensor G4 which explains the difference.
+
+---
+
+## Key Technical Findings
+
+**ExecuTorch 1.2.0 API change**
+LLM classes moved to `org.pytorch.executorch.extension.llm` — not documented at the time of development. Discovered by inspecting `classes.jar` inside the AAR directly.
+
+**MAX_TOKENS semantics**
+ExecuTorch's `generate(prompt, maxTokens, callback)` treats `maxTokens` as total sequence length (prompt + output), not output-only tokens. Setting `maxTokens = 1024` gives ~760 output tokens for a 266-token prompt.
+
+**KV cache reset**
+ExecuTorch accumulates `pos_` across `generate()` calls on the same `LlmModule` instance. After 2-3 runs the context fills up and generation produces 0 tokens. Fixed by recreating `LlmModule` before each call — `load()` uses mmap so it's near-instant.
+
+**Context window**
+Model metadata reports `get_max_context_len = 2048`. ExecuTorch calculates `max_new_tokens = maxTokens - prompt_tokens` which means input length directly reduces output budget.
 
 ---
 
 ## Stack
 
-- Model: `meta-llama/Llama-3.2-1B`
-- Framework: ExecuTorch + Optimum ExecuTorch
-- Quantization: 8da4w (int8 activations × int4 weights, group size 32)
-- Backend: XNNPACK
-- Platform: Android (Kotlin)
+| Component | Technology |
+|---|---|
+| Model | Llama 3.2 1B Instruct |
+| Quantization | SpinQuant INT4 (8da4w, group size 32) |
+| Runtime | ExecuTorch 1.2.0 Android |
+| Language | Kotlin |
+| UI | Jetpack Compose + Material3 |
+| Architecture | MVVM + StateFlow |
+| Min SDK | API 26 (Android 8.0) |
+| Target device | ARM64 Android |
 
 ---
 
-## Setup
+## Project Structure
 
-```bash
-pip install executorch optimum-executorch torchao transformers
-
-python export/export_model.py --model_id meta-llama/Llama-3.2-1B --output model.pte
-
-python export/validate.py --model_path model.pte --input "your article text"
+```
+edgelm/
+├── android/summarizer/app/src/main/java/com/example/edgelm_summarizer/
+│   ├── MainActivity.kt          — standalone summarizer UI
+│   ├── ProcessTextActivity.kt   — transparent Activity for text selection
+│   ├── SummarizerViewModel.kt   — MVVM ViewModel, StateFlow state
+│   ├── LlamaRunner.kt           — ExecuTorch inference wrapper
+│   └── ModelDownloader.kt       — first-launch model download
+├── export/
+│   ├── export_model.py          — export to .pte via Optimum ExecuTorch
+│   └── validate.py              — HuggingFace reference summarization
+└── docs/
+    ├── benchmarks.md            — Pixel 10 performance data
+    └── screenshots/             — app screenshots
 ```
 
-Copy `model.pte` to `android/summarizer/src/main/assets/` and open in Android Studio.
+---
+
+## Build & Run
+
+**Prerequisites**
+- Android Studio Hedgehog or later
+- Android device running API 26+ (ARM64)
+- ~2 GB free storage on device for model
+
+**Steps**
+
+```bash
+# Clone
+git clone https://github.com/harishcmuthyala/edgelm.git
+cd edgelm/android/summarizer
+
+# Build and install
+.\gradlew installDebug        # Windows
+./gradlew installDebug        # Mac/Linux
+```
+
+On first launch the app downloads the model (~1.1 GB) from HuggingFace. This happens once — subsequent launches go straight to the summarizer.
+
+**Model files** are not included in the repo or APK. They are downloaded automatically:
+- `Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte` — 1.14 GB
+- `tokenizer.model` — 2.1 MB
+
+Source: [executorch-community/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8-ET](https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8-ET)
 
 ---
 
-## Reference
+## Roadmap
 
-Nachin et al., *ExecuTorch: A Unified PyTorch Solution to Run AI Models On-Device*, MLSys 2026. [arXiv:2605.08195](https://arxiv.org/abs/2605.08195)
+| Phase | Status | Description |
+|---|---|---|
+| Phase 1 — Export & Validate | ✅ Done | Export pipeline, reference validation |
+| Phase 2 — Summarizer App | ✅ Done | Android app with streaming inference |
+| Phase 3 — Text Selection | ✅ Done | ACTION_PROCESS_TEXT system integration |
+| Phase 4 — Polish & Benchmark | 🔄 In Progress | Benchmarks, on-demand download, demo |
+
+---
+
+## References
+
+- [ExecuTorch: An End-to-End Solution for On-Device Inference](https://arxiv.org/abs/2605.08195) — MLSys 2026
+- [ExecuTorch Android Docs](https://pytorch.org/executorch/stable/using-executorch-android.html)
+- [Llama 3.2 Model Card](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)
+- [SpinQuant: LLM quantization with learned rotations](https://arxiv.org/abs/2405.16406)
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE)

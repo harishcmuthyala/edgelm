@@ -16,25 +16,151 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.example.edgelm_summarizer.ui.theme.EdgelmsummarizerTheme
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: SummarizerViewModel by viewModels()
 
+    private val _downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
+    private val downloadState: StateFlow<DownloadState> = _downloadState
+
+    sealed class DownloadState {
+        object Idle : DownloadState()
+        data class Downloading(val fileName: String, val percent: Int) : DownloadState()
+        object Done : DownloadState()
+        object Error : DownloadState()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Check if models need downloading
+        if (!ModelDownloader.modelsExist(this)) {
+            startDownload()
+        } else {
+            _downloadState.value = DownloadState.Done
+        }
+
         setContent {
             EdgelmsummarizerTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    SummaryScreen(viewModel = viewModel)
+                    val dlState by downloadState.collectAsState()
+                    when (dlState) {
+                        is DownloadState.Done -> SummaryScreen(viewModel = viewModel)
+                        is DownloadState.Error -> ErrorScreen(onRetry = { startDownload() })
+                        else -> DownloadScreen(state = dlState)
+                    }
                 }
             }
         }
     }
+
+    private fun startDownload() {
+        _downloadState.value = DownloadState.Downloading("Starting...", 0)
+        lifecycleScope.launch {
+            val success = ModelDownloader.downloadAll(this@MainActivity) { fileName, percent ->
+                _downloadState.value = DownloadState.Downloading(fileName, percent)
+            }
+            _downloadState.value = if (success) DownloadState.Done else DownloadState.Error
+        }
+    }
 }
 
+@Composable
+fun DownloadScreen(state: MainActivity.DownloadState) {
+    val downloading = state as? MainActivity.DownloadState.Downloading
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp)
+            .systemBarsPadding(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "edgelm",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "On-device summarization",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        Text(
+            text = "Downloading model...",
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (downloading != null && downloading.percent > 0) {
+            LinearProgressIndicator(
+                progress = { downloading.percent / 100f },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${downloading.fileName}  ${downloading.percent}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "This only happens once (~1.1 GB)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun ErrorScreen(onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp)
+            .systemBarsPadding(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Download failed",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Check your internet connection and try again.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onRetry) {
+            Text("Retry")
+        }
+    }
+}
+
+// ── SummaryScreen stays exactly the same as before ────────────────────────
 @Composable
 fun SummaryScreen(viewModel: SummarizerViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -47,7 +173,6 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
             .padding(16.dp)
             .systemBarsPadding()
     ) {
-
         Text(
             text = "edgelm",
             style = MaterialTheme.typography.headlineMedium,
