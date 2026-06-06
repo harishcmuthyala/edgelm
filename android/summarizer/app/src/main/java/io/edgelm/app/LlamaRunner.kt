@@ -1,4 +1,4 @@
-package com.example.edgelm_summarizer
+package io.edgelm.app
 
 import android.content.Context
 import org.pytorch.executorch.extension.llm.LlmCallback

@@ -1,4 +1,4 @@
-package com.example.edgelm_summarizer
+package io.edgelm.app
 
 import androidx.core.content.edit
 import androidx.core.net.toUri

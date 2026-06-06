@@ -1,4 +1,4 @@
-package com.example.edgelm_summarizer.ui.theme
+package io.edgelm.app.ui.theme
 
 import android.app.Activity
 import android.os.Build

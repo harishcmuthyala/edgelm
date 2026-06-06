@@ -1,4 +1,4 @@
-package com.example.edgelm_summarizer
+package io.edgelm.app
 
 import android.content.Intent
 import android.os.Bundle
@@ -17,7 +17,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.edgelm_summarizer.ui.theme.EdgelmsummarizerTheme
+import io.edgelm.app.ui.theme.EdgelmsummarizerTheme
 
 class ProcessTextActivity : ComponentActivity() {
 
