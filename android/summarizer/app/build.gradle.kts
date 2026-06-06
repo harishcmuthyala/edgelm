@@ -4,10 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 android {
-    namespace = "com.example.edgelm_summarizer"
+    namespace = "io.edgelm.app"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.edgelm_summarizer"
+        applicationId = "io.edgelm.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.example.edgelm_summarizer
+package io.edgelm.app
 
 import org.junit.Test
 

@@ -1,4 +1,4 @@
-package com.example.edgelm_summarizer
+package io.edgelm.app
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel

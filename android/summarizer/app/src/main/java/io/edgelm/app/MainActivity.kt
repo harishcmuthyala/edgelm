@@ -1,4 +1,4 @@
-package com.example.edgelm_summarizer
+package io.edgelm.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -17,7 +17,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
-import com.example.edgelm_summarizer.ui.theme.EdgelmsummarizerTheme
+import io.edgelm.app.ui.theme.EdgelmsummarizerTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
