@@ -10,16 +10,16 @@ edgelm runs a quantized Llama 3.2 1B model directly on your Android device using
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/01_download.png" width="200"/><br/><sub>First launch — model download</sub></td>
-    <td align="center"><img src="docs/screenshots/02_empty.png" width="200"/><br/><sub>Main screen</sub></td>
-    <td align="center"><img src="docs/screenshots/03_generating.png" width="200"/><br/><sub>Streaming summary</sub></td>
-    <td align="center"><img src="docs/screenshots/04_complete.png" width="200"/><br/><sub>Summary complete</sub></td>
+    <td align="center"><img src="docs/screenshots/01_download.jpeg" width="200"/><br/><sub>First launch — model download</sub></td>
+    <td align="center"><img src="docs/screenshots/02_empty.jpeg" width="200"/><br/><sub>Main screen</sub></td>
+    <td align="center"><img src="docs/screenshots/03_generating.jpeg" width="200"/><br/><sub>Streaming summary</sub></td>
+    <td align="center"><img src="docs/screenshots/04_complete.jpeg" width="200"/><br/><sub>Summary complete</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="docs/screenshots/05_text_select.png" width="200"/><br/><sub>Select text in Chrome</sub></td>
-    <td align="center"><img src="docs/screenshots/06_menu.png" width="200"/><br/><sub>edgelm in system menu</sub></td>
-    <td align="center"><img src="docs/screenshots/07_sheet_streaming.png" width="200"/><br/><sub>Bottom sheet streaming</sub></td>
-    <td align="center"><img src="docs/screenshots/08_sheet_complete.png" width="200"/><br/><sub>Summary over Chrome</sub></td>
+    <td align="center"><img src="docs/screenshots/06_menu.jpeg" width="200"/><br/><sub>edgelm in system menu</sub></td>
+    <td align="center"><img src="docs/screenshots/07_sheet_streaming.jpeg" width="200"/><br/><sub>Bottom sheet streaming</sub></td>
+    <td align="center"><img src="docs/screenshots/08_sheet_complete.jpeg" width="200"/><br/><sub>Summary over Chrome</sub></td>
   </tr>
 </table>
 
