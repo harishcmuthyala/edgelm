@@ -84,7 +84,7 @@ Measured on **Google Pixel 10** with Llama 3.2 1B SpinQuant INT4:
 | Metric | Value |
 |---|---|
 | Prefill speed | 150–220 tok/s |
-| Decode speed | 15–20 tok/s |
+| Decode speed | 20–25 tok/s |
 | Time to first token | 0.5–1.2s |
 | Total time (80 words input) | ~4–5s |
 | Model size | 1.14 GB (INT4 quantized) |
@@ -93,6 +93,38 @@ Measured on **Google Pixel 10** with Llama 3.2 1B SpinQuant INT4:
 | Max input | 200 words (~260 tokens) |
 
 **Paper benchmark** (OnePlus 12, Snapdragon 8 Elite): 50.2 tok/s decode, 260.5 tok/s prefill. Pixel 10 uses Tensor G4 which explains the difference.
+
+---
+
+## Known Limitations
+
+**Text selection compatibility**
+`ACTION_PROCESS_TEXT` only works in apps that use Android's standard
+text selection system. The following work:
+
+- Chrome ✅
+- Gmail ✅
+- Google Docs ✅
+- Google Keep ✅
+- Any app using standard Android TextView ✅
+
+The following do not work due to custom text rendering:
+
+- PDF viewers (Adobe Acrobat, Google Drive PDF) ❌
+- Some news apps with custom renderers ❌
+
+**Model size**
+The model downloads ~1.1 GB on first launch. This requires a stable
+internet connection and sufficient storage. Wi-Fi recommended.
+
+**Decode speed**
+~20-25 tok/s on Pixel 10 (Tensor G4). Devices with Snapdragon 8 Elite
+such as Samsung Galaxy S25 Ultra achieve ~50 tok/s per the ExecuTorch
+paper benchmarks.
+
+**Input limit**
+Maximum 200 words per summarization request. Longer inputs are
+truncated automatically.
 
 ---
 
