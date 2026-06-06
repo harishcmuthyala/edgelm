@@ -18,9 +18,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.edgelm_summarizer.ui.theme.EdgelmsummarizerTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 
 class MainActivity : ComponentActivity() {
 
@@ -29,22 +37,35 @@ class MainActivity : ComponentActivity() {
     private val _downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
     private val downloadState: StateFlow<DownloadState> = _downloadState
 
+    private var tokenizerDownloadId = -1L
+    private var modelDownloadId     = -1L
+    private var progressJob: Job?   = null
+
     sealed class DownloadState {
-        object Idle : DownloadState()
+        object Idle      : DownloadState()
+        object Copying   : DownloadState()
+        object Done      : DownloadState()
+        object Error     : DownloadState()
         data class Downloading(val fileName: String, val percent: Int) : DownloadState()
-        object Done : DownloadState()
-        object Error : DownloadState()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Check if models need downloading
-        if (!ModelDownloader.modelsExist(this)) {
-            startDownload()
-        } else {
+        if (ModelDownloader.modelsExist(this)) {
             _downloadState.value = DownloadState.Done
+        } else {
+            // Restore persisted download IDs in case app was killed mid-download
+            val (savedTokenizerId, savedModelId) = ModelDownloader.loadDownloadIds(this)
+            if (savedTokenizerId != -1L || savedModelId != -1L) {
+                tokenizerDownloadId = savedTokenizerId
+                modelDownloadId     = savedModelId
+                _downloadState.value = DownloadState.Downloading("Resuming...", 0)
+                pollProgress()
+            } else {
+                startDownload()
+            }
         }
 
         setContent {
@@ -52,9 +73,10 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val dlState by downloadState.collectAsState()
                     when (dlState) {
-                        is DownloadState.Done -> SummaryScreen(viewModel = viewModel)
-                        is DownloadState.Error -> ErrorScreen(onRetry = { startDownload() })
-                        else -> DownloadScreen(state = dlState)
+                        is DownloadState.Done        -> SummaryScreen(viewModel = viewModel)
+                        is DownloadState.Error       -> ErrorScreen(onRetry = { startDownload() })
+                        is DownloadState.Copying     -> CopyingScreen()
+                        else                         -> DownloadScreen(state = dlState)
                     }
                 }
             }
@@ -62,15 +84,97 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startDownload() {
-        _downloadState.value = DownloadState.Downloading("Starting...", 0)
-        lifecycleScope.launch {
-            val success = ModelDownloader.downloadAll(this@MainActivity) { fileName, percent ->
-                _downloadState.value = DownloadState.Downloading(fileName, percent)
+        val ids = ModelDownloader.enqueueDownloads(this)
+        tokenizerDownloadId = ids.first
+        modelDownloadId     = ids.second
+
+        // Persist IDs so we can resume if app is force-killed
+        ModelDownloader.saveDownloadIds(this, tokenizerDownloadId, modelDownloadId)
+
+        _downloadState.value = DownloadState.Downloading(
+            ModelDownloader.TOKENIZER_FILENAME, 0
+        )
+        pollProgress()
+    }
+
+    private fun pollProgress() {
+        progressJob?.cancel()
+        progressJob = lifecycleScope.launch {
+            while (true) {
+                delay(500)
+
+                // Check for failure
+                val tokenizerFailed = ModelDownloader.isDownloadFailed(
+                    this@MainActivity, tokenizerDownloadId
+                )
+                val modelFailed = ModelDownloader.isDownloadFailed(
+                    this@MainActivity, modelDownloadId
+                )
+                if (tokenizerFailed || modelFailed) {
+                    ModelDownloader.clearDownloadIds(this@MainActivity)
+                    _downloadState.value = DownloadState.Error
+                    break
+                }
+
+                val tokenizerDone = ModelDownloader.isDownloadComplete(
+                    this@MainActivity, tokenizerDownloadId
+                )
+                val modelDone = ModelDownloader.isDownloadComplete(
+                    this@MainActivity, modelDownloadId
+                )
+
+                when {
+                    modelDone && tokenizerDone -> {
+                        // Both done — copy to filesDir
+                        _downloadState.value = DownloadState.Copying
+                        withContext(Dispatchers.IO) {
+                            ModelDownloader.copyFromDownloadsToFilesDir(this@MainActivity)
+                        }
+                        ModelDownloader.clearDownloadIds(this@MainActivity)
+                        _downloadState.value = DownloadState.Done
+                        break
+                    }
+                    tokenizerDone -> {
+                        // Tokenizer done, show model progress
+                        val modelProgress = ModelDownloader.getProgress(
+                            this@MainActivity, modelDownloadId
+                        )
+                        _downloadState.value = DownloadState.Downloading(
+                            ModelDownloader.MODEL_FILENAME, modelProgress
+                        )
+                    }
+                    else -> {
+                        // Show tokenizer progress
+                        val tokenizerProgress = ModelDownloader.getProgress(
+                            this@MainActivity, tokenizerDownloadId
+                        )
+                        _downloadState.value = DownloadState.Downloading(
+                            ModelDownloader.TOKENIZER_FILENAME, tokenizerProgress
+                        )
+                    }
+                }
             }
-            _downloadState.value = if (success) DownloadState.Done else DownloadState.Error
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Resume polling when user comes back — download continued in background
+        val state = _downloadState.value
+        if (state !is DownloadState.Done && state !is DownloadState.Error &&
+            (modelDownloadId != -1L || tokenizerDownloadId != -1L)) {
+            pollProgress()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Stop polling UI — DownloadManager continues download in background
+        progressJob?.cancel()
+    }
 }
+
+// ── Download screen ───────────────────────────────────────────────────────────
 
 @Composable
 fun DownloadScreen(state: MainActivity.DownloadState) {
@@ -84,6 +188,17 @@ fun DownloadScreen(state: MainActivity.DownloadState) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Icon
+        Image(
+            painter = painterResource(id = R.drawable.ic_launcher_webp),
+            contentDescription = "EdgeLM icon",
+            modifier = Modifier
+                .size(120.dp)
+                .clip(RoundedCornerShape(24.dp))
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
             text = "EdgeLM",
             style = MaterialTheme.typography.headlineMedium,
@@ -120,17 +235,69 @@ fun DownloadScreen(state: MainActivity.DownloadState) {
             )
         } else {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = downloading?.fileName ?: "Starting...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "This only happens once (~1.1 GB)",
+            text = "This only happens once (~1.1 GB)\nDownload continues in background",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
+
+// ── Copying screen ────────────────────────────────────────────────────────────
+
+@Composable
+fun CopyingScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp)
+            .systemBarsPadding(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Icon
+        Image(
+            painter = painterResource(id = R.drawable.ic_launcher_webp),
+            contentDescription = "EdgeLM icon",
+            modifier = Modifier
+                .size(120.dp)
+                .clip(RoundedCornerShape(24.dp))
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "EdgeLM",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(48.dp))
+        CircularProgressIndicator()
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Preparing model...",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Almost ready",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// ── Error screen ──────────────────────────────────────────────────────────────
 
 @Composable
 fun ErrorScreen(onRetry: () -> Unit) {
@@ -160,7 +327,8 @@ fun ErrorScreen(onRetry: () -> Unit) {
     }
 }
 
-// ── SummaryScreen stays exactly the same as before ────────────────────────
+// ── Main summary screen ───────────────────────────────────────────────────────
+
 @Composable
 fun SummaryScreen(viewModel: SummarizerViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -225,7 +393,9 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
         if (uiState.inputText.isNotEmpty()) {
             Text(
                 text = "${uiState.wordCount} words" +
-                        if (uiState.isOverLimit) " — will be truncated to ${LlamaRunner.MAX_INPUT_WORDS}" else "",
+                        if (uiState.isOverLimit)
+                            " — will be truncated to ${LlamaRunner.MAX_INPUT_WORDS}"
+                        else "",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (uiState.isOverLimit)
                     MaterialTheme.colorScheme.error

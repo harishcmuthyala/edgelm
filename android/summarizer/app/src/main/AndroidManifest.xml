@@ -28,7 +28,7 @@
         <activity
             android:name=".ProcessTextActivity"
             android:exported="true"
-            android:label="edgelm"
+            android:label="Summarize"
             android:theme="@style/Theme.ProcessText">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
