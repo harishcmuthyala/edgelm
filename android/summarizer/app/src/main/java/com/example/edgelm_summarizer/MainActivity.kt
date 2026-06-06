@@ -85,7 +85,7 @@ fun DownloadScreen(state: MainActivity.DownloadState) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "edgelm",
+            text = "EdgeLM",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
@@ -174,7 +174,7 @@ fun SummaryScreen(viewModel: SummarizerViewModel) {
             .systemBarsPadding()
     ) {
         Text(
-            text = "edgelm",
+            text = "EdgeLM",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

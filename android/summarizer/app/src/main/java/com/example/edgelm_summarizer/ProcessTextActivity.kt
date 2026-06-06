@@ -80,7 +80,7 @@ fun ProcessTextScreen(
             ) {
                 Column {
                     Text(
-                        text = "edgelm",
+                        text = "EdgeLM",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
