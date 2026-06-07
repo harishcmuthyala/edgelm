@@ -99,19 +99,15 @@ Measured on **Google Pixel 10** with Llama 3.2 1B SpinQuant INT4:
 ## Known Limitations
 
 **Text selection compatibility**
-`ACTION_PROCESS_TEXT` only works in apps that use Android's standard
-text selection system. The following work:
+`ACTION_PROCESS_TEXT` works in apps that explicitly support 
+third-party text actions. Currently confirmed working:
 
 - Chrome ✅
-- Gmail ✅
-- Google Docs ✅
-- Google Keep ✅
 - Any app using standard Android TextView ✅
 
-The following do not work due to custom text rendering:
-
-- PDF viewers (Adobe Acrobat, Google Drive PDF) ❌
-- Some news apps with custom renderers ❌
+Apps that do not support it use custom text selection 
+implementations and must explicitly opt in — this is 
+outside EdgeLM's control.
 
 **Model size**
 The model downloads ~1.1 GB on first launch. This requires a stable
